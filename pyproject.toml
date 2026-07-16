@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=68", "wheel", "setuptools_scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prefect-couchbase"
+description = "Prefect collection for connecting flows and tasks to Couchbase."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+authors = [{ name = "Couchbase Examples", email = "devadvocacy@couchbase.com" }]
+keywords = ["prefect", "couchbase", "etl", "database", "connector"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Natural Language :: English",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Database",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = [
+  "couchbase>=4.4.0",
+  "prefect>=3.0.0",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2",
+  "coverage[toml]>=7.4",
+  "pytest>=8.0",
+  "pytest-cov>=5.0",
+  "ruff>=0.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/couchbase-examples/couchbase-prefect"
+Repository = "https://github.com/couchbase-examples/couchbase-prefect"
+Issues = "https://github.com/couchbase-examples/couchbase-prefect/issues"
+
+[project.entry-points."prefect.collections"]
+prefect_couchbase = "prefect_couchbase"
+
+[tool.setuptools.packages.find]
+include = ["prefect_couchbase*"]
+
+[tool.setuptools_scm]
+version_file = "prefect_couchbase/_version.py"
+fallback_version = "0.1.0"
+
+[tool.coverage.run]
+branch = true
+source = ["prefect_couchbase"]
+omit = ["prefect_couchbase/_version.py"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+skip_covered = true
+exclude_also = [
+  "if TYPE_CHECKING:",
+  "except Exception:  # pragma: no cover",
+]
+
+[tool.pytest.ini_options]
+addopts = "--cov=prefect_couchbase --cov-report=term-missing --cov-fail-under=100"
+testpaths = ["tests"]
+filterwarnings = [
+  "ignore::DeprecationWarning:pydantic.*",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "SIM"]
