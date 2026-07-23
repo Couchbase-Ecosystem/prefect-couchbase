@@ -130,13 +130,19 @@ For a quick local evaluation, the Couchbase Python SDK examples and Docker docum
    export COUCHBASE_BUCKET="travel-sample"
    ```
 
-3. Run the example flow from this repository:
+3. Save a credentials block once from the current environment:
 
    ```bash
-   python examples/flow.py
+   python examples/save_credentials_block.py
    ```
 
-4. Validate by checking that the flow prints:
+4. Run the example flow, which loads the saved block:
+
+   ```bash
+   python examples/couchbase_flow.py
+   ```
+
+5. Validate by checking that the flow prints:
 
    ```text
    Stored document: {'type': 'hotel', 'name': 'Prefect Grand Hotel'}
@@ -181,10 +187,10 @@ uv run python -m build
 Run the example smoke check without a live Couchbase cluster:
 
 ```bash
-uv run python -m py_compile examples/flow.py
+uv run python -m py_compile examples/save_credentials_block.py examples/couchbase_flow.py
 ```
 
-Run the example against a live cluster by setting the environment variables from the tutorial and executing `uv run python examples/flow.py`.
+Run the examples against a live cluster by setting the environment variables from the tutorial, saving the block with `uv run python examples/save_credentials_block.py`, and then executing `uv run python examples/couchbase_flow.py`.
 
 ### Release and publishing path
 
