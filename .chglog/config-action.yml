@@ -1,0 +1,31 @@
+style: github
+template: CHANGELOG-ACTION.tpl.md
+info:
+  title: CHANGELOG
+  repository_url: https://github.com/couchbase-examples/couchbase-prefect
+options:
+  # No `commits.filters` on purpose. The template renders only the Features and
+  # Bug Fixes groups, but every commit still has to be collected here, because
+  # git-chglog gathers BREAKING CHANGE notes only from the commits it processes.
+  # Filtering by Type would silently drop a breaking change that was declared on
+  # a refactor:, perf: or build: commit.
+  commit_groups:
+    group_by: Type
+    sort_by: Custom
+    title_order:
+      - feat
+      - fix
+    title_maps:
+      feat: Features
+      fix: Bug Fixes
+  header:
+    # Matches "feat: subject" and "feat(scope): subject". The scope group is
+    # optional, so unscoped commits still match.
+    pattern: "^(\\w*)(?:\\(([\\w\\$\\.\\-\\*\\s]*)\\))?\\:\\s(.*)$"
+    pattern_maps:
+      - Type
+      - Scope
+      - Subject
+  notes:
+    keywords:
+      - BREAKING CHANGE
