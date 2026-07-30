@@ -160,8 +160,8 @@ For a quick local evaluation, the Couchbase Python SDK examples and Docker docum
 ### Local development
 
 ```bash
-git clone https://github.com/couchbase-examples/couchbase-prefect.git
-cd couchbase-prefect
+git clone https://github.com/couchbase-examples/prefect-couchbase.git
+cd prefect-couchbase
 uv sync --extra dev
 ```
 

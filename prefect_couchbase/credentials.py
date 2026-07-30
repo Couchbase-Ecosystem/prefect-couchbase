@@ -39,7 +39,7 @@ class CouchbaseCredentials(CredentialsBlock):
         "https://www.couchbase.com/wp-content/uploads/2023/05/CB-logo-2023.svg"
     )
     _documentation_url: ClassVar[str] = (
-        "https://github.com/couchbase-examples/couchbase-prefect"
+        "https://github.com/couchbase-examples/prefect-couchbase"
     )
 
     connection_string: str = Field(
