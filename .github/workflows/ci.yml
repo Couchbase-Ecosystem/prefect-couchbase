@@ -1,0 +1,130 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+  # Called by release.yml so a tag push cannot publish untested code.
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          # Installing the project runs setuptools_scm, which reads the version
+          # from git. fetch-depth: 0 alone is not enough: checkout always passes
+          # --no-tags to git fetch, so fetch-tags is required as well.
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        # --locked fails if uv.lock has drifted from pyproject.toml.
+        run: uv sync --locked --extra dev
+
+      - name: Ruff lint
+        run: uv run --no-sync ruff check --output-format=github .
+
+      - name: Ruff format check
+        run: uv run --no-sync ruff format --check .
+
+      - name: Byte-compile examples
+        run: uv run --no-sync python -m compileall -q examples
+
+  test:
+    name: test (python ${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # Matches requires-python (>=3.10) and the classifiers in pyproject.toml.
+        # 3.14 is excluded on purpose: the locked pydantic/prefect stack fails to
+        # import on CPython 3.14 (typing._eval_type signature change).
+        python-version:
+          - "3.10"
+          - "3.11"
+          - "3.12"
+          - "3.13"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          # See the lint job: needed for setuptools_scm.
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+          cache-suffix: py${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: uv sync --locked --extra dev --python ${{ matrix.python-version }}
+
+      - name: Run unit tests
+        # tests/integration requires a live Couchbase cluster, so it is excluded
+        # here instead of silently skipping. The coverage gate configured in
+        # pyproject.toml (--cov-fail-under=100) is met by the unit suite alone.
+        run: uv run --no-sync pytest -vv --ignore=tests/integration
+
+  build:
+    name: build distributions
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          # See the lint job: needed for setuptools_scm.
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Check distribution metadata
+        run: uvx twine check --strict dist/*
+
+      - name: Import the built wheel in a clean environment
+        run: |
+          uv run --no-project --with ./dist/*.whl python -c \
+            "import prefect_couchbase as m; print(m.CouchbaseConnector, m.CouchbaseCredentials)"
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: dist-ci
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7

@@ -1,0 +1,208 @@
+name: Release
+
+on:
+  push:
+    tags:
+      # Filter patterns are globs, not regex: "+" means one or more of the
+      # preceding character. Matches v1.2.3, v10.20.30, v1.2.3rc1.
+      - "v[0-9]+.[0-9]+.[0-9]+*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # A tag push does not match ci.yml's branch filters, so CI is invoked here as
+  # a reusable workflow. Nothing is published unless lint, the 3.10-3.13 test
+  # matrix, and the build check all pass on this exact commit.
+  # Note: only name/uses/with/secrets/strategy/needs/if/concurrency/permissions
+  # are valid on a job that calls a reusable workflow (no timeout-minutes).
+  ci:
+    name: ci
+    uses: ./.github/workflows/ci.yml
+
+  package:
+    name: package and verify
+    needs: ci
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          # setuptools_scm needs the full history and tags to derive the version.
+          # fetch-depth: 0 alone is not enough: checkout always passes --no-tags
+          # to git fetch, so without fetch-tags only the pushed tag arrives.
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v9.0.0
+        with:
+          enable-cache: true
+
+      # Built here rather than reusing ci.yml's artifact so this job stays
+      # self-contained: it builds, checks and verifies the exact files it
+      # uploads for publishing.
+      - name: Build sdist and wheel
+        run: uv build
+
+      - name: Check distribution metadata
+        run: uvx twine check --strict dist/*
+
+      - name: Import the built wheel in a clean environment
+        run: |
+          uv run --no-project --with ./dist/*.whl python -c \
+            "import prefect_couchbase as m; print(m.CouchbaseConnector, m.CouchbaseCredentials)"
+
+      - name: Resolve and verify the version
+        id: version
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+          IS_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          sdists=(dist/prefect_couchbase-*.tar.gz)
+          if [ "${#sdists[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one sdist in dist/, found ${#sdists[@]}."
+            exit 1
+          fi
+          built="${sdists[0]#dist/prefect_couchbase-}"
+          built="${built%.tar.gz}"
+
+          if [ "${IS_TAG}" = "true" ]; then
+            expected="${TAG_NAME#v}"
+            if [ "${built}" != "${expected}" ]; then
+              echo "::error::Built version '${built}' does not match tag '${TAG_NAME}'. The tag must point at a clean commit so setuptools_scm resolves an exact release version."
+              exit 1
+            fi
+          fi
+
+          # Anything that is not exactly N.N.N (rc/alpha/beta/post/dev) is a pre-release.
+          if [[ "${built}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            prerelease=false
+          else
+            prerelease=true
+          fi
+          echo "prerelease=${prerelease}" >> "${GITHUB_OUTPUT}"
+
+          {
+            echo "### Release candidate"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| version | \`${built}\` |"
+            echo "| ref | \`${TAG_NAME}\` |"
+            echo "| pre-release | \`${prerelease}\` |"
+            echo "| publishes to PyPI | \`${IS_TAG}\` |"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: dist-release
+          path: dist/
+          if-no-files-found: error
+
+  pypi-publish:
+    name: publish to PyPI
+    # Only tag pushes publish; workflow_dispatch runs are build/verify dry runs
+    # (an untagged commit resolves to a .devN version via setuptools_scm).
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      # Mandatory for PyPI trusted publishing, and for the attestations the
+      # action generates by default.
+      id-token: write
+    steps:
+      - name: Download distributions
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: dist-release
+          path: dist/
+
+      # packages-dir defaults to dist/. Requires a PyPI trusted publisher for
+      # this repository and workflow file; if that publisher is configured with
+      # an environment, add a matching `environment:` to this job.
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.14.1
+
+  github-release:
+    name: create GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    # `package` is listed explicitly so needs.package.outputs is available here.
+    needs: [package, pypi-publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+        with:
+          # git-chglog needs the full history and every tag to diff this tag
+          # against its predecessor. fetch-tags is mandatory: checkout always
+          # passes --no-tags to git fetch and, for a tag push, only fetches the
+          # pushed tag. Without the previous tag, git-chglog treats this as the
+          # first release and dumps the entire history into the release notes.
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version: stable
+          cache: false
+
+      - name: Install git-chglog
+        run: |
+          set -euo pipefail
+          go install github.com/git-chglog/git-chglog/cmd/git-chglog@v0.15.4
+          echo "$(go env GOPATH)/bin" >> "${GITHUB_PATH}"
+
+      - name: Generate changelog
+        id: changelog
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # The tag argument is required: without it git-chglog renders every
+          # tag in the repository instead of just this release.
+          git-chglog -c .chglog/config-action.yml -o /tmp/changelog.md "${TAG_NAME}"
+          cat /tmp/changelog.md
+          cat /tmp/changelog.md >> "${GITHUB_STEP_SUMMARY}"
+          # The template only emits a "### " section when it has content, so its
+          # absence means this tag carried no features, fixes or breaking
+          # changes (e.g. a docs-only or chore-only release). Fall back to
+          # GitHub's auto-generated notes then, so a release is never blank.
+          if grep -qE '^### ' /tmp/changelog.md; then
+            echo "fallback=false" >> "${GITHUB_OUTPUT}"
+          else
+            echo "::warning::No features, fixes or breaking changes for ${TAG_NAME}; using GitHub auto-generated notes."
+            echo "fallback=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Download distributions
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: dist-release
+          path: dist/
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v3.0.2
+        with:
+          files: dist/*
+          body_path: /tmp/changelog.md
+          generate_release_notes: ${{ steps.changelog.outputs.fallback == 'true' }}
+          prerelease: ${{ needs.package.outputs.prerelease == 'true' }}
