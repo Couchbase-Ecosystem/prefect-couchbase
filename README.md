@@ -1,6 +1,6 @@
 # prefect-couchbase
 
-A Prefect collection for connecting Prefect flows and tasks to Couchbase through the official Couchbase Python SDK.
+A Prefect integration for connecting Prefect flows and tasks to Couchbase through the official Couchbase Python SDK.
 
 ## What you can use it for
 
