@@ -2,7 +2,7 @@ style: github
 template: CHANGELOG-ACTION.tpl.md
 info:
   title: CHANGELOG
-  repository_url: https://github.com/couchbase-examples/prefect-couchbase
+  repository_url: https://github.com/Couchbase-Ecosystem/prefect-couchbase
 options:
   # No `commits.filters` on purpose. The template renders only the Features and
   # Bug Fixes groups, but every commit still has to be collected here, because

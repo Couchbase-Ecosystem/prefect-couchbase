@@ -36,10 +36,10 @@ class CouchbaseCredentials(CredentialsBlock):
 
     _block_type_name: ClassVar[str] = "Couchbase Credentials"
     _logo_url: ClassVar[str] = (
-        "https://www.couchbase.com/wp-content/uploads/2023/05/CB-logo-2023.svg"
+        "https://www.couchbase.com/wp-content/uploads/2023/10/SDKs_Ottoman.svg"
     )
     _documentation_url: ClassVar[str] = (
-        "https://github.com/couchbase-examples/prefect-couchbase"
+        "https://github.com/Couchbase-Ecosystem/prefect-couchbase"
     )
 
     connection_string: str = Field(
