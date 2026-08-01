@@ -38,9 +38,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/couchbase-examples/prefect-couchbase"
-Repository = "https://github.com/couchbase-examples/prefect-couchbase"
-Issues = "https://github.com/couchbase-examples/prefect-couchbase/issues"
+Homepage = "https://github.com/Couchbase-Ecosystem/prefect-couchbase"
+Repository = "https://github.com/Couchbase-Ecosystem/prefect-couchbase"
+Issues = "https://github.com/Couchbase-Ecosystem/prefect-couchbase/issues"
 
 [project.entry-points."prefect.collections"]
 prefect_couchbase = "prefect_couchbase"

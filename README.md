@@ -1,6 +1,6 @@
 # prefect-couchbase
 
-A Prefect collection for connecting Prefect flows and tasks to Couchbase through the official Couchbase Python SDK.
+A Prefect integration for connecting Prefect flows and tasks to Couchbase through the official Couchbase Python SDK.
 
 ## What you can use it for
 
@@ -160,7 +160,7 @@ For a quick local evaluation, the Couchbase Python SDK examples and Docker docum
 ### Local development
 
 ```bash
-git clone https://github.com/couchbase-examples/prefect-couchbase.git
+git clone https://github.com/Couchbase-Ecosystem/prefect-couchbase.git
 cd prefect-couchbase
 uv sync --extra dev
 ```
