@@ -44,7 +44,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v9.0.0
+        uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
 
@@ -135,7 +135,7 @@ jobs:
       # this repository and workflow file; if that publisher is configured with
       # an environment, add a matching `environment:` to this job.
       - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.14.1
+        uses: pypa/gh-action-pypi-publish@v1.14.2
 
   github-release:
     name: create GitHub release
@@ -200,7 +200,7 @@ jobs:
           path: dist/
 
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v3.0.2
+        uses: softprops/action-gh-release@v3.0.3
         with:
           files: dist/*
           body_path: /tmp/changelog.md
