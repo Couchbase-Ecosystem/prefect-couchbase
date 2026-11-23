@@ -40,11 +40,22 @@ class CouchbaseConnector(Generic[ContentT]):
 
     @property
     def cluster(self) -> Cluster:
-        """Return a cached Couchbase SDK cluster, creating it on first use."""
+        """Return a cached Couchbase SDK cluster, creating it on first use.
+
+        Only a ready cluster is cached. If `wait_until_ready_timeout` is set and
+        the readiness check fails, the new cluster is closed before the error is
+        re-raised, so a failed `with connector:` does not leak connections and
+        the next access retries with a fresh cluster.
+        """
         if self._cluster is None:
-            self._cluster = self.credentials.get_cluster()
+            cluster = self.credentials.get_cluster()
             if self.wait_until_ready_timeout is not None:
-                self._cluster.wait_until_ready(self.wait_until_ready_timeout)
+                try:
+                    cluster.wait_until_ready(self.wait_until_ready_timeout)
+                except BaseException:
+                    cluster.close()
+                    raise
+            self._cluster = cluster
         return self._cluster
 
     def close(self) -> None:

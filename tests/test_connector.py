@@ -27,6 +27,27 @@ def test_cluster_is_created_lazily_and_cached(credentials):
     cluster.wait_until_ready.assert_called_once_with(timeout)
 
 
+def test_cluster_that_is_not_ready_is_closed_and_not_cached(credentials):
+    unready = MagicMock()
+    unready.wait_until_ready.side_effect = TimeoutError("not ready")
+    ready = MagicMock()
+    credentials.get_cluster.side_effect = [unready, ready]
+    timeout = timedelta(seconds=10)
+    connector = CouchbaseConnector(
+        credentials=credentials, wait_until_ready_timeout=timeout
+    )
+
+    with pytest.raises(TimeoutError, match="not ready"), connector:
+        pass  # pragma: no cover - __enter__ raises before the body runs
+
+    unready.close.assert_called_once_with()
+    assert connector._cluster is None
+
+    assert connector.cluster is ready
+    ready.wait_until_ready.assert_called_once_with(timeout)
+    assert credentials.get_cluster.call_count == 2
+
+
 def test_context_manager_opens_and_closes_cluster(credentials):
     cluster = MagicMock()
     credentials.get_cluster.return_value = cluster
